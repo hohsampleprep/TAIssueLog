@@ -32,9 +32,9 @@
 
         <div class="border-2 border-dashed border-indigo-200 rounded-xl p-4 bg-indigo-50/40 text-center">
           <label class="block text-sm font-semibold text-indigo-950 mb-1">Scan Test Assignment (TA) Sheet</label>
-          <p class="text-xs text-slate-500 mb-3">Upload or capture photo. The scanner auto-detects rotation and handwritten/printed reference numbers.</p>
+          <p class="text-xs text-slate-500 mb-3">Upload or take a photo. Adjust rotation until text is upright before scanning.</p>
           
-          <input type="file" id="cameraInput" accept="image/*" capture="environment" class="hidden" onchange="handleImageUpload(event)">
+          <input type="file" id="cameraInput" accept="image/*" class="hidden" onchange="handleImageUpload(event)">
           
           <div class="flex justify-center gap-2 flex-wrap">
             <button type="button" onclick="startLiveCamera('ocr')" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-xs font-medium transition shadow-sm">
@@ -46,7 +46,7 @@
           </div>
 
           <div id="ocrStatus" class="mt-3 text-xs font-semibold text-indigo-700 hidden">
-            <span id="ocrStatusText">Preparing image scanner...</span>
+            <span id="ocrStatusText">Processing scan...</span>
           </div>
 
           <div id="imagePreviewContainer" class="mt-3 hidden space-y-3">
@@ -54,25 +54,37 @@
               <img id="imagePreview" class="max-h-56 object-contain rounded transition-transform duration-200" alt="TA Sheet Preview" />
             </div>
             
-            <div class="flex justify-center gap-2">
+            <div class="flex justify-center gap-2 flex-wrap">
               <button type="button" onclick="rotatePreviewManual()" class="bg-amber-600 hover:bg-amber-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium shadow-sm">
-                🔄 Manual Rotate 90°
+                🔄 Rotate 90°
               </button>
-              <button type="button" onclick="triggerScanCurrentOrientation()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium shadow-sm">
-                🔍 Rescan Photo
+              <button type="button" onclick="triggerEnhancedScan()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium shadow-sm">
+                🔍 Run OCR Scan
               </button>
             </div>
+          </div>
+
+          <div id="candidateContainer" class="mt-4 hidden text-left bg-white p-3 rounded-lg border border-slate-200">
+            <p class="text-xs font-semibold text-slate-700 mb-2">Detected Number Candidates (Tap to auto-fill):</p>
+            <div id="candidateChips" class="flex flex-wrap gap-2"></div>
+          </div>
+
+          <div id="ocrDebugContainer" class="mt-3 hidden text-left">
+            <details class="text-xs text-slate-500 bg-slate-100 p-2 rounded border border-slate-200">
+              <summary class="cursor-pointer font-medium text-slate-700">View Raw Extracted Text (Debug)</summary>
+              <pre id="rawOcrText" class="mt-2 whitespace-pre-wrap font-mono text-[11px] bg-slate-800 text-slate-100 p-2 rounded max-h-32 overflow-y-auto"></pre>
+            </details>
           </div>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label for="ianRefNo" class="block text-sm font-medium text-slate-700 mb-1">IAN / HK Ref No. (e.g. 20260827-009)</label>
-            <input type="text" id="ianRefNo" placeholder="Auto-extracted or enter manually" required class="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+            <label for="ianRefNo" class="block text-sm font-medium text-slate-700 mb-1">IAN / HK Ref No.</label>
+            <input type="text" id="ianRefNo" placeholder="e.g. 20260827-009 or 265768_2604" required class="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
           </div>
           <div>
-            <label for="reportNo" class="block text-sm font-medium text-slate-700 mb-1">Report No. / LIMS No. (e.g. 26.0039656)</label>
-            <input type="text" id="reportNo" placeholder="Auto-extracted or enter manually" required class="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+            <label for="reportNo" class="block text-sm font-medium text-slate-700 mb-1">Report No. / LIMS No.</label>
+            <input type="text" id="reportNo" placeholder="e.g. 26.0039656" required class="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
           </div>
         </div>
 
@@ -98,14 +110,14 @@
           <label class="block text-sm font-semibold text-slate-700 mb-1">Issue Location Photo Reference</label>
           <p class="text-xs text-slate-500 mb-3">Attach a photo capturing the issue location on the document.</p>
           
-          <input type="file" id="locationImageInput" accept="image/*" capture="environment" class="hidden" onchange="handleLocationImageUpload(event)">
+          <input type="file" id="locationImageInput" accept="image/*" class="hidden" onchange="handleLocationImageUpload(event)">
           
           <div class="flex items-center gap-2 flex-wrap">
             <button type="button" onclick="startLiveCamera('location')" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-medium shadow-sm">
               📸 Capture Location Photo
             </button>
             <button type="button" onclick="document.getElementById('locationImageInput').click()" class="bg-slate-600 hover:bg-slate-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-medium shadow-sm">
-              📁 Upload File
+              📁 Choose File
             </button>
             <span id="locationPhotoName" class="text-xs text-slate-500 italic">No photo attached</span>
           </div>
@@ -117,11 +129,11 @@
 
         <div>
           <label for="remarks" class="block text-sm font-medium text-slate-700 mb-1">Additional Remarks</label>
-          <textarea id="remarks" rows="2" placeholder="Specify details about the issue location..." class="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"></textarea>
+          <textarea id="remarks" rows="2" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"></textarea>
         </div>
 
         <button type="submit" id="submitBtn" class="w-full bg-indigo-700 hover:bg-indigo-800 text-white font-medium py-2.5 rounded-lg transition shadow">
-          Submit Log Entry
+          Submit to Google Sheet
         </button>
       </form>
     </div>
@@ -139,14 +151,13 @@
   </div>
 
   <script>
-    const GOOGLE_SCRIPT_URL = "https://docs.google.com/spreadsheets/d/1eQ0KaOkuUiV3eS2DX_xiHQ991CTVQEWQfOsNBCGG9bw/edit?usp=sharing";
+    const GOOGLE_SCRIPT_URL = "YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL";
     let locationPhotoBase64 = "";
     let currentCameraTarget = ""; 
     let mediaStream = null;
     let manualRotationAngle = 0;
-    let rawLoadedImage = null;
+    let loadedImageObj = null;
 
-    // Handle File Upload
     function handleImageUpload(event) {
       const file = event.target.files[0];
       if (!file) return;
@@ -155,104 +166,16 @@
       reader.onload = function(e) {
         const img = new Image();
         img.onload = function() {
-          rawLoadedImage = img;
+          loadedImageObj = img;
           manualRotationAngle = 0;
           document.getElementById("imagePreview").src = e.target.result;
           document.getElementById("imagePreview").style.transform = "rotate(0deg)";
           document.getElementById("imagePreviewContainer").classList.remove("hidden");
-          
-          autoScanAllOrientations(img);
+          triggerEnhancedScan();
         };
         img.src = e.target.result;
       };
       reader.readAsDataURL(file);
-    }
-
-    // Preprocess image to high-contrast grayscale for improved OCR read
-    function renderEnhancedCanvas(imgElement, rotationAngle) {
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
-
-      if (rotationAngle === 90 || rotationAngle === 270) {
-        canvas.width = imgElement.naturalHeight || imgElement.height;
-        canvas.height = imgElement.naturalWidth || imgElement.width;
-      } else {
-        canvas.width = imgElement.naturalWidth || imgElement.width;
-        canvas.height = imgElement.naturalHeight || imgElement.height;
-      }
-
-      ctx.translate(canvas.width / 2, canvas.height / 2);
-      ctx.rotate((rotationAngle * Math.PI) / 180);
-      ctx.filter = "contrast(180%) grayscale(100%) brightness(105%)";
-      ctx.drawImage(imgElement, -imgElement.naturalWidth / 2, -imgElement.naturalHeight / 2);
-
-      return canvas;
-    }
-
-    // Automatic multi-angle OCR scanner (0°, 90°, 180°, 270°)
-    async function autoScanAllOrientations(imgElement) {
-      const status = document.getElementById("ocrStatus");
-      const statusText = document.getElementById("ocrStatusText");
-      status.classList.remove("hidden");
-
-      const angles = [0, 90, 270, 180];
-      let extractedLims = "";
-      let extractedRef = "";
-
-      for (let i = 0; i < angles.length; i++) {
-        const angle = angles[i];
-        statusText.innerText = `Scanning orientation (${i+1}/4 - ${angle}°)...`;
-        
-        const enhancedCanvas = renderEnhancedCanvas(imgElement, angle);
-        const dataUrl = enhancedCanvas.toDataURL("image/jpeg", 0.9);
-
-        try {
-          const { data: { text } } = await Tesseract.recognize(dataUrl, 'eng');
-          const result = parseOCRText(text);
-
-          if (result.lims) extractedLims = result.lims;
-          if (result.ref) extractedRef = result.ref;
-
-          // If both numbers found, break early and auto-adjust visual preview rotation
-          if (extractedLims && extractedRef) {
-            manualRotationAngle = angle;
-            document.getElementById("imagePreview").style.transform = `rotate(${angle}deg)`;
-            break;
-          }
-        } catch (err) {
-          console.error("OCR angle scan error:", err);
-        }
-      }
-
-      // Populate input fields
-      if (extractedLims) document.getElementById("reportNo").value = extractedLims;
-      if (extractedRef) document.getElementById("ianRefNo").value = extractedRef;
-
-      if (extractedLims || extractedRef) {
-        statusText.innerText = "Scan complete! Check extracted fields below.";
-      } else {
-        statusText.innerText = "Automatic scan completed. Please verify or manually type reference numbers.";
-      }
-    }
-
-    // Manual single orientation scan
-    async function triggerScanCurrentOrientation() {
-      if (!rawLoadedImage) return;
-      const statusText = document.getElementById("ocrStatusText");
-      statusText.innerText = "Rescanning current view...";
-      
-      const enhancedCanvas = renderEnhancedCanvas(rawLoadedImage, manualRotationAngle);
-      const dataUrl = enhancedCanvas.toDataURL("image/jpeg", 0.9);
-
-      try {
-        const { data: { text } } = await Tesseract.recognize(dataUrl, 'eng');
-        const result = parseOCRText(text);
-        if (result.lims) document.getElementById("reportNo").value = result.lims;
-        if (result.ref) document.getElementById("ianRefNo").value = result.ref;
-        statusText.innerText = "Rescan complete!";
-      } catch (err) {
-        statusText.innerText = "Scan failed. Please type details manually.";
-      }
     }
 
     function rotatePreviewManual() {
@@ -260,53 +183,157 @@
       document.getElementById("imagePreview").style.transform = `rotate(${manualRotationAngle}deg)`;
     }
 
-    // Fuzzy Regex Parser to clean common handwriting & OCR mistakes
-    function parseOCRText(rawText) {
-      let foundLims = "";
-      let foundRef = "";
+    // High-contrast, scaled canvas rendering to optimize OCR reading
+    function renderOptimizedCanvas(imgElement, rotationAngle) {
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
 
-      // Clean line strings
-      const lines = rawText.split('\n');
+      // Downscale high-res mobile photos to max 1200px width/height for fast OCR
+      const maxDim = 1200;
+      let width = imgElement.naturalWidth || imgElement.width;
+      let height = imgElement.naturalHeight || imgElement.height;
 
-      // 1. Report No. / LIMS No. Search (e.g., 26.0039656, 26.0038976AM01, 26.0.33989)
-      const limsRegex = /(?:LIMS|Report|No)[\s\.\:]*([2Z][6B][\.\,\s]*\d[\d\.\,\sOoSsZz]{5,12})/i;
-      const directLimsRegex = /\b(2[6b][\.\,]\d[0-9OoSsZz\.\,]{5,12})\b/i;
-
-      let limsMatch = rawText.match(limsRegex) || rawText.match(directLimsRegex);
-      if (limsMatch) {
-        let cleanLims = (limsMatch[1] || limsMatch[0])
-          .replace(/\s+/g, '')
-          .replace(/,/g, '.')
-          .replace(/O/gi, '0')
-          .replace(/S/gi, '5')
-          .replace(/Z/gi, '2')
-          .replace(/B/gi, '8');
-        foundLims = cleanLims;
-      }
-
-      // 2. HK Ref No. / IAN Search (e.g., 20260827-009, 265768_2604, 20260826-001)
-      const refRegex = /\b([2Z0O][0-9OoSsZz]{7}[\-_/\s][0-9OoSsZzGg]{3,4})\b/;
-      const standardIanRegex = /\b(\d{6}_\d{4})\b/;
-      const headerRefRegex = /(?:HK\s*Ref|IAN)[\s\.\:]*([A-Z0-9_\-]{7,15})/i;
-
-      let refMatch = rawText.match(refRegex) || rawText.match(standardIanRegex) || rawText.match(headerRefRegex);
-      if (refMatch) {
-        let cleanRef = (refMatch[1] || refMatch[0])
-          .replace(/\s+/g, '')
-          .replace(/O/gi, '0')
-          .replace(/g/gi, '9')
-          .replace(/Z/gi, '2')
-          .replace(/S/gi, '5');
-        
-        if (cleanRef.toUpperCase() !== 'NA') {
-          foundRef = cleanRef;
+      if (width > maxDim || height > maxDim) {
+        if (width > height) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        } else {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
         }
       }
 
-      return { lims: foundLims, ref: foundRef };
+      if (rotationAngle === 90 || rotationAngle === 270) {
+        canvas.width = height;
+        canvas.height = width;
+      } else {
+        canvas.width = width;
+        canvas.height = height;
+      }
+
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate((rotationAngle * Math.PI) / 180);
+      
+      // Canvas Filters: Maximize contrast to make light/handwritten ink stand out
+      ctx.filter = "contrast(200%) grayscale(100%) brightness(110%)";
+      ctx.drawImage(imgElement, -width / 2, -height / 2, width, height);
+
+      return canvas;
     }
 
-    // Live Camera Controls
+    async function triggerEnhancedScan() {
+      if (!loadedImageObj) return;
+
+      const status = document.getElementById("ocrStatus");
+      const statusText = document.getElementById("ocrStatusText");
+      status.classList.remove("hidden");
+      statusText.innerText = "Scanning text... Please wait.";
+
+      const canvas = renderOptimizedCanvas(loadedImageObj, manualRotationAngle);
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
+
+      try {
+        const worker = await Tesseract.createWorker('eng');
+        const { data: { text } } = await worker.recognize(dataUrl);
+        await worker.terminate();
+
+        // Show raw text in debug view
+        document.getElementById("rawOcrText").innerText = text || "[No text detected]";
+        document.getElementById("ocrDebugContainer").classList.remove("hidden");
+
+        const parsed = parseOCRTextAdvanced(text);
+
+        if (parsed.lims) document.getElementById("reportNo").value = parsed.lims;
+        if (parsed.ref) document.getElementById("ianRefNo").value = parsed.ref;
+
+        renderCandidateChips(parsed.candidates);
+
+        if (parsed.lims || parsed.ref) {
+          statusText.innerText = "Scan complete! Reference numbers populated.";
+        } else {
+          statusText.innerText = "Scan finished. Check detected candidates below or enter manually.";
+        }
+      } catch (err) {
+        statusText.innerText = "OCR extraction error. Please type values manually.";
+        console.error(err);
+      }
+    }
+
+    // Tokenized regex engine with handwriting digit normalization
+    function parseOCRTextAdvanced(rawText) {
+      if (!rawText) return { lims: "", ref: "", candidates: [] };
+
+      let limsVal = "";
+      let refVal = "";
+      const candidates = [];
+
+      // Split raw OCR output into word tokens
+      const tokens = rawText.split(/[\s\n\r]+/);
+
+      tokens.forEach(token => {
+        let cleanToken = token.replace(/^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$/g, '');
+        if (cleanToken.length < 5) return;
+
+        // Fix handwritten character/number confusions
+        let normalized = cleanToken
+          .replace(/O/gi, '0')
+          .replace(/Z/gi, '2')
+          .replace(/S/gi, '5')
+          .replace(/g/g, '9')
+          .replace(/B/g, '8');
+
+        // Check for LIMS No pattern (e.g., 26.0039656)
+        if (!limsVal && (normalized.match(/^2[68]\.[\d\.]{5,12}/) || normalized.includes('26.'))) {
+          let match = normalized.match(/2[68][\.\,]\d[\d\.\,]{4,12}/);
+          if (match) {
+            limsVal = match[0].replace(/,/g, '.');
+            candidates.push({ type: 'LIMS', val: limsVal });
+          }
+        }
+
+        // Check for HK Ref No / IAN pattern (e.g., 20260827-009 or 265768_2604)
+        if (!refVal) {
+          let refMatch = normalized.match(/202\d{5}[-_\/]\d{3,4}/) || 
+                         normalized.match(/\d{8}[-_\/]\d{3,4}/) || 
+                         normalized.match(/\d{6}_\d{4}/);
+          if (refMatch) {
+            refVal = refMatch[0];
+            candidates.push({ type: 'HK Ref', val: refVal });
+          }
+        }
+      });
+
+      return { lims: limsVal, ref: refVal, candidates };
+    }
+
+    function renderCandidateChips(candidates) {
+      const container = document.getElementById("candidateContainer");
+      const chipsArea = document.getElementById("candidateChips");
+      chipsArea.innerHTML = "";
+
+      if (candidates.length === 0) {
+        container.classList.add("hidden");
+        return;
+      }
+
+      container.classList.remove("hidden");
+      candidates.forEach(item => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "bg-indigo-100 hover:bg-indigo-200 text-indigo-900 border border-indigo-300 rounded-md px-2.5 py-1 text-xs font-semibold flex items-center gap-1 transition";
+        btn.innerText = `+ Use ${item.type}: ${item.val}`;
+        btn.onclick = () => {
+          if (item.type === 'LIMS') {
+            document.getElementById("reportNo").value = item.val;
+          } else {
+            document.getElementById("ianRefNo").value = item.val;
+          }
+        };
+        chipsArea.appendChild(btn);
+      });
+    }
+
+    // Live Camera Stream Handling
     async function startLiveCamera(target) {
       currentCameraTarget = target;
       const modal = document.getElementById("cameraModal");
@@ -320,7 +347,7 @@
         video.srcObject = mediaStream;
         modal.classList.remove("hidden");
       } catch (err) {
-        alert("Camera direct access unavailable. Use 'Choose Photo File' to select an image from gallery.");
+        alert("Camera direct access blocked. Use 'Choose Photo File' to select an image from your device gallery.");
       }
     }
 
@@ -337,18 +364,18 @@
       if (currentCameraTarget === 'ocr') {
         const img = new Image();
         img.onload = function() {
-          rawLoadedImage = img;
+          loadedImageObj = img;
           manualRotationAngle = 0;
           document.getElementById("imagePreview").src = dataUrl;
           document.getElementById("imagePreview").style.transform = "rotate(0deg)";
           document.getElementById("imagePreviewContainer").classList.remove("hidden");
-          autoScanAllOrientations(img);
+          triggerEnhancedScan();
         };
         img.src = dataUrl;
       } else if (currentCameraTarget === 'location') {
         document.getElementById("locationPreview").src = dataUrl;
         document.getElementById("locationPreviewContainer").classList.remove("hidden");
-        document.getElementById("locationPhotoName").innerText = "Location Photo Captured";
+        document.getElementById("locationPhotoName").innerText = "Photo Captured";
         locationPhotoBase64 = dataUrl;
       }
       closeCameraModal();
@@ -374,7 +401,6 @@
       reader.readAsDataURL(file);
     }
 
-    // Save Data to Google Sheet
     async function saveIssue(e) {
       e.preventDefault();
       const category = document.querySelector('input[name="category"]:checked')?.value;
@@ -410,20 +436,22 @@
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload)
           });
-          alert("Log record submitted successfully to Google Sheet!");
+          alert("Submitted successfully to Google Sheet!");
           document.getElementById("issueForm").reset();
           document.getElementById("imagePreviewContainer").classList.add("hidden");
+          document.getElementById("candidateContainer").classList.add("hidden");
+          document.getElementById("ocrDebugContainer").classList.add("hidden");
           document.getElementById("locationPreviewContainer").classList.add("hidden");
           document.getElementById("ocrStatus").classList.add("hidden");
         } catch (err) {
           alert("Network error transmitting to Google Sheet.");
         }
       } else {
-        alert("Form validated! Replace GOOGLE_SCRIPT_URL in code to write directly to your Google Sheet.");
+        alert("Form validated. Replace GOOGLE_SCRIPT_URL to save directly to Google Sheets.");
       }
 
       submitBtn.disabled = false;
-      submitBtn.innerText = "Submit Log Entry";
+      submitBtn.innerText = "Submit to Google Sheet";
     }
   </script>
 </body>
