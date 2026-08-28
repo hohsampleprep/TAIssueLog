@@ -32,7 +32,7 @@
 
         <div class="border-2 border-dashed border-indigo-200 rounded-xl p-4 bg-indigo-50/40 text-center">
           <label class="block text-sm font-semibold text-indigo-950 mb-1">Scan Test Assignment (TA) Sheet</label>
-          <p class="text-xs text-slate-500 mb-3">Upload or take a photo. Adjust rotation until text is upright before scanning.</p>
+          <p class="text-xs text-slate-500 mb-3">Upload or take a photo. If needed, click "Rotate 90°" to make text upright before scanning.</p>
           
           <input type="file" id="cameraInput" accept="image/*" class="hidden" onchange="handleImageUpload(event)">
           
@@ -65,15 +65,8 @@
           </div>
 
           <div id="candidateContainer" class="mt-4 hidden text-left bg-white p-3 rounded-lg border border-slate-200">
-            <p class="text-xs font-semibold text-slate-700 mb-2">Detected Number Candidates (Tap to auto-fill):</p>
+            <p class="text-xs font-semibold text-slate-700 mb-2">Detected Candidate Numbers (Tap to fill input):</p>
             <div id="candidateChips" class="flex flex-wrap gap-2"></div>
-          </div>
-
-          <div id="ocrDebugContainer" class="mt-3 hidden text-left">
-            <details class="text-xs text-slate-500 bg-slate-100 p-2 rounded border border-slate-200">
-              <summary class="cursor-pointer font-medium text-slate-700">View Raw Extracted Text (Debug)</summary>
-              <pre id="rawOcrText" class="mt-2 whitespace-pre-wrap font-mono text-[11px] bg-slate-800 text-slate-100 p-2 rounded max-h-32 overflow-y-auto"></pre>
-            </details>
           </div>
         </div>
 
@@ -108,7 +101,7 @@
 
         <div class="border border-slate-200 rounded-xl p-4 bg-slate-50">
           <label class="block text-sm font-semibold text-slate-700 mb-1">Issue Location Photo Reference</label>
-          <p class="text-xs text-slate-500 mb-3">Attach a photo capturing the issue location on the document.</p>
+          <p class="text-xs text-slate-500 mb-3">Attach a photo capturing the issue location.</p>
           
           <input type="file" id="locationImageInput" accept="image/*" class="hidden" onchange="handleLocationImageUpload(event)">
           
@@ -133,7 +126,7 @@
         </div>
 
         <button type="submit" id="submitBtn" class="w-full bg-indigo-700 hover:bg-indigo-800 text-white font-medium py-2.5 rounded-lg transition shadow">
-          Submit to Google Sheet
+          Submit to Issue Log
         </button>
       </form>
     </div>
@@ -151,7 +144,9 @@
   </div>
 
   <script>
-    const GOOGLE_SCRIPT_URL = "YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL";
+    // Paste your deployed Apps Script Web App URL below
+    const GOOGLE_SCRIPT_URL = "YOUR_DEPLOYED_WEB_APP_URL_HERE";
+    
     let locationPhotoBase64 = "";
     let currentCameraTarget = ""; 
     let mediaStream = null;
@@ -183,12 +178,10 @@
       document.getElementById("imagePreview").style.transform = `rotate(${manualRotationAngle}deg)`;
     }
 
-    // High-contrast, scaled canvas rendering to optimize OCR reading
     function renderOptimizedCanvas(imgElement, rotationAngle) {
       const canvas = document.createElement("canvas");
       const ctx = canvas.getContext("2d");
 
-      // Downscale high-res mobile photos to max 1200px width/height for fast OCR
       const maxDim = 1200;
       let width = imgElement.naturalWidth || imgElement.width;
       let height = imgElement.naturalHeight || imgElement.height;
@@ -213,8 +206,6 @@
 
       ctx.translate(canvas.width / 2, canvas.height / 2);
       ctx.rotate((rotationAngle * Math.PI) / 180);
-      
-      // Canvas Filters: Maximize contrast to make light/handwritten ink stand out
       ctx.filter = "contrast(200%) grayscale(100%) brightness(110%)";
       ctx.drawImage(imgElement, -width / 2, -height / 2, width, height);
 
@@ -237,10 +228,6 @@
         const { data: { text } } = await worker.recognize(dataUrl);
         await worker.terminate();
 
-        // Show raw text in debug view
-        document.getElementById("rawOcrText").innerText = text || "[No text detected]";
-        document.getElementById("ocrDebugContainer").classList.remove("hidden");
-
         const parsed = parseOCRTextAdvanced(text);
 
         if (parsed.lims) document.getElementById("reportNo").value = parsed.lims;
@@ -255,26 +242,21 @@
         }
       } catch (err) {
         statusText.innerText = "OCR extraction error. Please type values manually.";
-        console.error(err);
       }
     }
 
-    // Tokenized regex engine with handwriting digit normalization
     function parseOCRTextAdvanced(rawText) {
       if (!rawText) return { lims: "", ref: "", candidates: [] };
 
       let limsVal = "";
       let refVal = "";
       const candidates = [];
-
-      // Split raw OCR output into word tokens
       const tokens = rawText.split(/[\s\n\r]+/);
 
       tokens.forEach(token => {
         let cleanToken = token.replace(/^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$/g, '');
         if (cleanToken.length < 5) return;
 
-        // Fix handwritten character/number confusions
         let normalized = cleanToken
           .replace(/O/gi, '0')
           .replace(/Z/gi, '2')
@@ -282,7 +264,6 @@
           .replace(/g/g, '9')
           .replace(/B/g, '8');
 
-        // Check for LIMS No pattern (e.g., 26.0039656)
         if (!limsVal && (normalized.match(/^2[68]\.[\d\.]{5,12}/) || normalized.includes('26.'))) {
           let match = normalized.match(/2[68][\.\,]\d[\d\.\,]{4,12}/);
           if (match) {
@@ -291,7 +272,6 @@
           }
         }
 
-        // Check for HK Ref No / IAN pattern (e.g., 20260827-009 or 265768_2604)
         if (!refVal) {
           let refMatch = normalized.match(/202\d{5}[-_\/]\d{3,4}/) || 
                          normalized.match(/\d{8}[-_\/]\d{3,4}/) || 
@@ -333,7 +313,6 @@
       });
     }
 
-    // Live Camera Stream Handling
     async function startLiveCamera(target) {
       currentCameraTarget = target;
       const modal = document.getElementById("cameraModal");
@@ -347,7 +326,7 @@
         video.srcObject = mediaStream;
         modal.classList.remove("hidden");
       } catch (err) {
-        alert("Camera direct access blocked. Use 'Choose Photo File' to select an image from your device gallery.");
+        alert("Camera direct access blocked. Use 'Choose Photo File'.");
       }
     }
 
@@ -416,7 +395,7 @@
 
       const submitBtn = document.getElementById("submitBtn");
       submitBtn.disabled = true;
-      submitBtn.innerText = "Submitting to Google Sheet...";
+      submitBtn.innerText = "Submitting to Issue Log...";
 
       const payload = {
         timestamp: new Date().toLocaleString(),
@@ -428,7 +407,7 @@
         photoReference: locationPhotoBase64 ? "Attached" : "None"
       };
 
-      if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL !== "YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL") {
+      if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL !== "YOUR_DEPLOYED_WEB_APP_URL_HERE") {
         try {
           await fetch(GOOGLE_SCRIPT_URL, {
             method: "POST",
@@ -440,18 +419,17 @@
           document.getElementById("issueForm").reset();
           document.getElementById("imagePreviewContainer").classList.add("hidden");
           document.getElementById("candidateContainer").classList.add("hidden");
-          document.getElementById("ocrDebugContainer").classList.add("hidden");
           document.getElementById("locationPreviewContainer").classList.add("hidden");
           document.getElementById("ocrStatus").classList.add("hidden");
         } catch (err) {
           alert("Network error transmitting to Google Sheet.");
         }
       } else {
-        alert("Form validated. Replace GOOGLE_SCRIPT_URL to save directly to Google Sheets.");
+        alert("Form validated! Replace GOOGLE_SCRIPT_URL to save directly to your Google Sheet.");
       }
 
       submitBtn.disabled = false;
-      submitBtn.innerText = "Submit to Google Sheet";
+      submitBtn.innerText = "Submit to Issue Log";
     }
   </script>
 </body>
