@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Hohenstein Sample Preparation Team Test Assignment Issue Log</title>
+  <title>Hohenstein Sample Preparation Team - Test Assignment Issue Log</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
@@ -144,8 +144,8 @@
   </div>
 
   <script>
-    // Paste your deployed Apps Script Web App URL below
-    const GOOGLE_SCRIPT_URL = "https://docs.google.com/spreadsheets/d/1eQ0KaOkuUiV3eS2DX_xiHQ991CTVQEWQfOsNBCGG9bw/edit?usp=sharing";
+    // Paste your deployed Google Apps Script Web App URL below
+    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw1CvMRW5T5wHFOjNZ8-iXPTfYMb_Vx-ROQGKwKbIHhbNeohUXH1dZ6XPGTuvo15XE/exec";
     
     let locationPhotoBase64 = "";
     let currentCameraTarget = ""; 
@@ -399,37 +399,35 @@
 
       const payload = {
         timestamp: new Date().toLocaleString(),
-        category,
-        ianRefNo,
-        reportNo,
+        category: category,
+        ianRefNo: ianRefNo,
+        reportNo: reportNo,
         issues: selectedIssues.join(", "),
-        remarks,
+        remarks: remarks,
         photoReference: locationPhotoBase64 ? "Attached" : "None"
       };
 
-      if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL !== "YOUR_DEPLOYED_WEB_APP_URL_HERE") {
-        try {
-          await fetch(GOOGLE_SCRIPT_URL, {
-            method: "POST",
-            mode: "no-cors",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-          });
-          alert("Submitted successfully to Google Sheet!");
-          document.getElementById("issueForm").reset();
-          document.getElementById("imagePreviewContainer").classList.add("hidden");
-          document.getElementById("candidateContainer").classList.add("hidden");
-          document.getElementById("locationPreviewContainer").classList.add("hidden");
-          document.getElementById("ocrStatus").classList.add("hidden");
-        } catch (err) {
-          alert("Network error transmitting to Google Sheet.");
-        }
-      } else {
-        alert("Form validated! Replace GOOGLE_SCRIPT_URL to save directly to your Google Sheet.");
-      }
+      try {
+        // Send payload as text/plain to prevent browser preflight CORS blocks
+        await fetch(GOOGLE_SCRIPT_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify(payload)
+        });
 
-      submitBtn.disabled = false;
-      submitBtn.innerText = "Submit to Issue Log";
+        alert("Submitted successfully to Issue Log!");
+        document.getElementById("issueForm").reset();
+        document.getElementById("imagePreviewContainer")?.classList.add("hidden");
+        document.getElementById("candidateContainer")?.classList.add("hidden");
+        document.getElementById("locationPreviewContainer")?.classList.add("hidden");
+        document.getElementById("ocrStatus")?.classList.add("hidden");
+      } catch (err) {
+        alert("Submission failed. Please check network connection.");
+        console.error(err);
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerText = "Submit to Issue Log";
+      }
     }
   </script>
 </body>
