@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hohenstein Sample Preparation Team Test Assignment Issue Log</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans min-h-screen pb-12">
+
+  <div class="max-w-3xl mx-auto mt-6 px-4">
+    <header class="bg-indigo-900 text-white rounded-xl p-6 shadow-md mb-6">
+      <h1 class="text-2xl font-bold tracking-tight">Hohenstein Sample Preparation Team</h1>
+      <p class="text-indigo-200 text-sm mt-1">Test Assignment Issue Log</p>
+    </header>
+
+    <!-- Issue Form -->
+    <div class="bg-white rounded-xl shadow-md p-6 mb-6">
+      <form id="issueForm" class="space-y-6" onsubmit="saveIssue(event)">
+        
+        <!-- Category -->
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-2">Category</label>
+          <div class="flex gap-4">
+            <label class="flex items-center gap-2 cursor-pointer border rounded-lg px-4 py-2 hover:bg-slate-50 border-slate-300 flex-1 justify-center font-medium">
+              <input type="radio" name="category" value="HG" required class="accent-indigo-600" /> HG
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer border rounded-lg px-4 py-2 hover:bg-slate-50 border-slate-300 flex-1 justify-center font-medium">
+              <input type="radio" name="category" value="TX" class="accent-indigo-600" /> TX
+            </label>
+          </div>
+        </div>
+
+        <!-- TA Sheet OCR Photo Capture -->
+        <div class="border-2 border-dashed border-indigo-200 rounded-xl p-4 bg-indigo-50/40 text-center">
+          <label class="block text-sm font-semibold text-indigo-950 mb-1">Scan Test Assignment (TA) Sheet</label>
+          <p class="text-xs text-slate-500 mb-3">Take a photo or choose an image to extract reference numbers.</p>
+          
+          <input type="file" id="cameraInput" accept="image/*" class="hidden" onchange="handleImageUpload(event)">
+          
+          <div class="flex justify-center gap-2 flex-wrap">
+            <button type="button" onclick="startLiveCamera('ocr')" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 rounded-lg text-xs font-medium transition shadow-sm">
+              📷 Open Live Camera
+            </button>
+            <button type="button" onclick="document.getElementById('cameraInput').click()" class="bg-slate-600 hover:bg-slate-700 text-white px-3.5 py-2 rounded-lg text-xs font-medium transition shadow-sm">
+              📁 Choose Photo File
+            </button>
+          </div>
+
+          <div id="ocrStatus" class="mt-3 text-xs font-semibold text-indigo-600 hidden">Scanning text...</div>
+          <div id="imagePreviewContainer" class="mt-3 hidden">
+            <img id="imagePreview" class="max-h-48 mx-auto rounded-md shadow border" alt="TA Sheet Preview" />
+          </div>
+        </div>
+
+        <!-- Reference Numbers -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label for="ianRefNo" class="block text-sm font-medium text-slate-700 mb-1">IAN / Hohenstein Ref No.</label>
+            <input type="text" id="ianRefNo" required class="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+          </div>
+          <div>
+            <label for="reportNo" class="block text-sm font-medium text-slate-700 mb-1">Report No.</label>
+            <input type="text" id="reportNo" required class="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+          </div>
+        </div>
+
+        <!-- Issues Checkboxes -->
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-2">Select Identified Issues</label>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <label class="flex items-center gap-2 p-2.5 border rounded-lg border-slate-200 hover:bg-slate-50 text-sm">
+              <input type="checkbox" name="issues" value="Typo" class="rounded text-indigo-600 h-4 w-4" /> Typo
+            </label>
+            <label class="flex items-center gap-2 p-2.5 border rounded-lg border-slate-200 hover:bg-slate-50 text-sm">
+              <input type="checkbox" name="issues" value="Incorrect information provided" class="rounded text-indigo-600 h-4 w-4" /> Incorrect information provided
+            </label>
+            <label class="flex items-center gap-2 p-2.5 border rounded-lg border-slate-200 hover:bg-slate-50 text-sm">
+              <input type="checkbox" name="issues" value="Misuse of column" class="rounded text-indigo-600 h-4 w-4" /> Misuse of column
+            </label>
+            <label class="flex items-center gap-2 p-2.5 border rounded-lg border-slate-200 hover:bg-slate-50 text-sm">
+              <input type="checkbox" name="issues" value="Missing information" class="rounded text-indigo-600 h-4 w-4" /> Missing information
+            </label>
+          </div>
+        </div>
+
+        <!-- Location Photo Reference -->
+        <div class="border border-slate-200 rounded-xl p-4 bg-slate-50">
+          <label class="block text-sm font-semibold text-slate-700 mb-1">Issue Location Photo Reference</label>
+          <p class="text-xs text-slate-500 mb-3">Attach a photo capturing the issue location.</p>
+          
+          <input type="file" id="locationImageInput" accept="image/*" class="hidden" onchange="handleLocationImageUpload(event)">
+          
+          <div class="flex items-center gap-2 flex-wrap">
+            <button type="button" onclick="startLiveCamera('location')" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium shadow-sm">
+              📸 Take Location Photo
+            </button>
+            <button type="button" onclick="document.getElementById('locationImageInput').click()" class="bg-slate-600 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium shadow-sm">
+              📁 Choose File
+            </button>
+            <span id="locationPhotoName" class="text-xs text-slate-500 italic">No photo attached</span>
+          </div>
+          
+          <div id="locationPreviewContainer" class="mt-3 hidden">
+            <img id="locationPreview" class="max-h-36 rounded-md shadow border" alt="Location Preview" />
+          </div>
+        </div>
+
+        <!-- Remarks -->
+        <div>
+          <label for="remarks" class="block text-sm font-medium text-slate-700 mb-1">Additional Remarks</label>
+          <textarea id="remarks" rows="2" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"></textarea>
+        </div>
+
+        <button type="submit" id="submitBtn" class="w-full bg-indigo-700 hover:bg-indigo-800 text-white font-medium py-2.5 rounded-lg transition shadow">
+          Submit
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Live Camera Modal -->
+  <div id="cameraModal" class="fixed inset-0 bg-black/80 z-50 flex flex-col items-center justify-center hidden p-4">
+    <div class="bg-white rounded-xl overflow-hidden max-w-md w-full p-4 flex flex-col items-center">
+      <video id="videoFeed" autoplay playsinline class="w-full h-64 bg-black rounded-lg object-cover mb-4"></video>
+      <canvas id="canvas" class="hidden"></canvas>
+      <div class="flex gap-4">
+        <button onclick="captureFromCamera()" class="bg-emerald-600 text-white px-5 py-2 rounded-lg font-medium text-sm">Snap Photo</button>
+        <button onclick="closeCameraModal()" class="bg-slate-500 text-white px-4 py-2 rounded-lg font-medium text-sm">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxFzJjRxKPL8QS6gegWBYGHLgcSVvCXT4rQCCNEDwMegjSoHNegyoG_lccl3023Kgul/exec";
+    let locationPhotoBase64 = "";
+    let currentCameraTarget = ""; 
+    let mediaStream = null;
+
+    // Camera Stream Management
+    async function startLiveCamera(target) {
+      currentCameraTarget = target;
+      const modal = document.getElementById("cameraModal");
+      const video = document.getElementById("videoFeed");
+
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: { ideal: "environment" } }, 
+          audio: false 
+        });
+        video.srcObject = mediaStream;
+        modal.classList.remove("hidden");
+      } catch (err) {
+        alert("Unable to access camera directly. Please use the 'Choose Photo File' option.");
+        console.error(err);
+      }
+    }
+
+    function captureFromCamera() {
+      const video = document.getElementById("videoFeed");
+      const canvas = document.getElementById("canvas");
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
+      
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL("image/jpeg");
+
+      if (currentCameraTarget === 'ocr') {
+        document.getElementById("imagePreview").src = dataUrl;
+        document.getElementById("imagePreviewContainer").classList.remove("hidden");
+        processImageOCR(dataUrl);
+      } else if (currentCameraTarget === 'location') {
+        document.getElementById("locationPreview").src = dataUrl;
+        document.getElementById("locationPreviewContainer").classList.remove("hidden");
+        document.getElementById("locationPhotoName").innerText = "Photo Captured";
+        locationPhotoBase64 = dataUrl;
+      }
+      closeCameraModal();
+    }
+
+    function closeCameraModal() {
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(track => track.stop());
+      }
+      document.getElementById("cameraModal").classList.add("hidden");
+    }
+
+    // OCR Processing
+    async function processImageOCR(imageSource) {
+      const status = document.getElementById("ocrStatus");
+      status.classList.remove("hidden");
+      status.innerText = "Scanning text from image...";
+
+      try {
+        const { data: { text } } = await Tesseract.recognize(imageSource, 'eng');
+        status.innerText = "Scan complete!";
+        parseOCRText(text);
+      } catch (error) {
+        status.innerText = "OCR extraction failed. Enter details manually.";
+      }
+    }
+
+    function handleImageUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        document.getElementById("imagePreview").src = e.target.result;
+        document.getElementById("imagePreviewContainer").classList.remove("hidden");
+        processImageOCR(e.target.result);
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function handleLocationImageUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      document.getElementById("locationPhotoName").innerText = file.name;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        document.getElementById("locationPreview").src = e.target.result;
+        document.getElementById("locationPreviewContainer").classList.remove("hidden");
+        locationPhotoBase64 = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function parseOCRText(text) {
+      const ianMatch = text.match(/\b\d{6}_\d{4}\b|\b\d{8}-\d{3}\b/);
+      if (ianMatch) document.getElementById("ianRefNo").value = ianMatch[0];
+
+      const reportMatch = text.match(/\b\d{2}\.[\d\.]+[A-Z0-9]*\b/i);
+      if (reportMatch) document.getElementById("reportNo").value = reportMatch[0];
+    }
+
+    async function saveIssue(e) {
+      e.preventDefault();
+      const category = document.querySelector('input[name="category"]:checked')?.value;
+      const ianRefNo = document.getElementById("ianRefNo").value.trim();
+      const reportNo = document.getElementById("reportNo").value.trim();
+      const remarks = document.getElementById("remarks").value.trim();
+      const selectedIssues = Array.from(document.querySelectorAll('input[name="issues"]:checked')).map(cb => cb.value);
+
+      if (selectedIssues.length === 0) {
+        alert("Please select at least one issue type.");
+        return;
+      }
+
+      const payload = {
+        timestamp: new Date().toLocaleString(),
+        category,
+        ianRefNo,
+        reportNo,
+        issues: selectedIssues.join(", "),
+        remarks,
+        photoReference: locationPhotoBase64 ? "Attached" : "None"
+      };
+
+      if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL !== "YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL") {
+        await fetch(GOOGLE_SCRIPT_URL, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        alert("Issue submitted successfully!");
+      } else {
+        alert("Form validated. Configure GOOGLE_SCRIPT_URL to save directly to Google Sheets.");
+      }
+      document.getElementById("issueForm").reset();
+    }
+  </script>
+</body>
+</html>
