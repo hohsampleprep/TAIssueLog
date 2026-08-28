@@ -139,7 +139,7 @@
   </div>
 
   <script>
-    const GOOGLE_SCRIPT_URL = "YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL";
+    const GOOGLE_SCRIPT_URL = "https://docs.google.com/spreadsheets/d/1eQ0KaOkuUiV3eS2DX_xiHQ991CTVQEWQfOsNBCGG9bw/edit?usp=sharing";
     let locationPhotoBase64 = "";
     let currentCameraTarget = ""; 
     let mediaStream = null;
@@ -182,4 +182,249 @@
       }
 
       ctx.translate(canvas.width / 2, canvas.height / 2);
-      ctx.rotate((rotationAngle * Math.PI) / 1
+      ctx.rotate((rotationAngle * Math.PI) / 180);
+      ctx.filter = "contrast(180%) grayscale(100%) brightness(105%)";
+      ctx.drawImage(imgElement, -imgElement.naturalWidth / 2, -imgElement.naturalHeight / 2);
+
+      return canvas;
+    }
+
+    // Automatic multi-angle OCR scanner (0°, 90°, 180°, 270°)
+    async function autoScanAllOrientations(imgElement) {
+      const status = document.getElementById("ocrStatus");
+      const statusText = document.getElementById("ocrStatusText");
+      status.classList.remove("hidden");
+
+      const angles = [0, 90, 270, 180];
+      let extractedLims = "";
+      let extractedRef = "";
+
+      for (let i = 0; i < angles.length; i++) {
+        const angle = angles[i];
+        statusText.innerText = `Scanning orientation (${i+1}/4 - ${angle}°)...`;
+        
+        const enhancedCanvas = renderEnhancedCanvas(imgElement, angle);
+        const dataUrl = enhancedCanvas.toDataURL("image/jpeg", 0.9);
+
+        try {
+          const { data: { text } } = await Tesseract.recognize(dataUrl, 'eng');
+          const result = parseOCRText(text);
+
+          if (result.lims) extractedLims = result.lims;
+          if (result.ref) extractedRef = result.ref;
+
+          // If both numbers found, break early and auto-adjust visual preview rotation
+          if (extractedLims && extractedRef) {
+            manualRotationAngle = angle;
+            document.getElementById("imagePreview").style.transform = `rotate(${angle}deg)`;
+            break;
+          }
+        } catch (err) {
+          console.error("OCR angle scan error:", err);
+        }
+      }
+
+      // Populate input fields
+      if (extractedLims) document.getElementById("reportNo").value = extractedLims;
+      if (extractedRef) document.getElementById("ianRefNo").value = extractedRef;
+
+      if (extractedLims || extractedRef) {
+        statusText.innerText = "Scan complete! Check extracted fields below.";
+      } else {
+        statusText.innerText = "Automatic scan completed. Please verify or manually type reference numbers.";
+      }
+    }
+
+    // Manual single orientation scan
+    async function triggerScanCurrentOrientation() {
+      if (!rawLoadedImage) return;
+      const statusText = document.getElementById("ocrStatusText");
+      statusText.innerText = "Rescanning current view...";
+      
+      const enhancedCanvas = renderEnhancedCanvas(rawLoadedImage, manualRotationAngle);
+      const dataUrl = enhancedCanvas.toDataURL("image/jpeg", 0.9);
+
+      try {
+        const { data: { text } } = await Tesseract.recognize(dataUrl, 'eng');
+        const result = parseOCRText(text);
+        if (result.lims) document.getElementById("reportNo").value = result.lims;
+        if (result.ref) document.getElementById("ianRefNo").value = result.ref;
+        statusText.innerText = "Rescan complete!";
+      } catch (err) {
+        statusText.innerText = "Scan failed. Please type details manually.";
+      }
+    }
+
+    function rotatePreviewManual() {
+      manualRotationAngle = (manualRotationAngle + 90) % 360;
+      document.getElementById("imagePreview").style.transform = `rotate(${manualRotationAngle}deg)`;
+    }
+
+    // Fuzzy Regex Parser to clean common handwriting & OCR mistakes
+    function parseOCRText(rawText) {
+      let foundLims = "";
+      let foundRef = "";
+
+      // Clean line strings
+      const lines = rawText.split('\n');
+
+      // 1. Report No. / LIMS No. Search (e.g., 26.0039656, 26.0038976AM01, 26.0.33989)
+      const limsRegex = /(?:LIMS|Report|No)[\s\.\:]*([2Z][6B][\.\,\s]*\d[\d\.\,\sOoSsZz]{5,12})/i;
+      const directLimsRegex = /\b(2[6b][\.\,]\d[0-9OoSsZz\.\,]{5,12})\b/i;
+
+      let limsMatch = rawText.match(limsRegex) || rawText.match(directLimsRegex);
+      if (limsMatch) {
+        let cleanLims = (limsMatch[1] || limsMatch[0])
+          .replace(/\s+/g, '')
+          .replace(/,/g, '.')
+          .replace(/O/gi, '0')
+          .replace(/S/gi, '5')
+          .replace(/Z/gi, '2')
+          .replace(/B/gi, '8');
+        foundLims = cleanLims;
+      }
+
+      // 2. HK Ref No. / IAN Search (e.g., 20260827-009, 265768_2604, 20260826-001)
+      const refRegex = /\b([2Z0O][0-9OoSsZz]{7}[\-_/\s][0-9OoSsZzGg]{3,4})\b/;
+      const standardIanRegex = /\b(\d{6}_\d{4})\b/;
+      const headerRefRegex = /(?:HK\s*Ref|IAN)[\s\.\:]*([A-Z0-9_\-]{7,15})/i;
+
+      let refMatch = rawText.match(refRegex) || rawText.match(standardIanRegex) || rawText.match(headerRefRegex);
+      if (refMatch) {
+        let cleanRef = (refMatch[1] || refMatch[0])
+          .replace(/\s+/g, '')
+          .replace(/O/gi, '0')
+          .replace(/g/gi, '9')
+          .replace(/Z/gi, '2')
+          .replace(/S/gi, '5');
+        
+        if (cleanRef.toUpperCase() !== 'NA') {
+          foundRef = cleanRef;
+        }
+      }
+
+      return { lims: foundLims, ref: foundRef };
+    }
+
+    // Live Camera Controls
+    async function startLiveCamera(target) {
+      currentCameraTarget = target;
+      const modal = document.getElementById("cameraModal");
+      const video = document.getElementById("videoFeed");
+
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: { ideal: "environment" } }, 
+          audio: false 
+        });
+        video.srcObject = mediaStream;
+        modal.classList.remove("hidden");
+      } catch (err) {
+        alert("Camera direct access unavailable. Use 'Choose Photo File' to select an image from gallery.");
+      }
+    }
+
+    function captureFromCamera() {
+      const video = document.getElementById("videoFeed");
+      const canvas = document.getElementById("canvas");
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
+      
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL("image/jpeg");
+
+      if (currentCameraTarget === 'ocr') {
+        const img = new Image();
+        img.onload = function() {
+          rawLoadedImage = img;
+          manualRotationAngle = 0;
+          document.getElementById("imagePreview").src = dataUrl;
+          document.getElementById("imagePreview").style.transform = "rotate(0deg)";
+          document.getElementById("imagePreviewContainer").classList.remove("hidden");
+          autoScanAllOrientations(img);
+        };
+        img.src = dataUrl;
+      } else if (currentCameraTarget === 'location') {
+        document.getElementById("locationPreview").src = dataUrl;
+        document.getElementById("locationPreviewContainer").classList.remove("hidden");
+        document.getElementById("locationPhotoName").innerText = "Location Photo Captured";
+        locationPhotoBase64 = dataUrl;
+      }
+      closeCameraModal();
+    }
+
+    function closeCameraModal() {
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(track => track.stop());
+      }
+      document.getElementById("cameraModal").classList.add("hidden");
+    }
+
+    function handleLocationImageUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      document.getElementById("locationPhotoName").innerText = file.name;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        document.getElementById("locationPreview").src = e.target.result;
+        document.getElementById("locationPreviewContainer").classList.remove("hidden");
+        locationPhotoBase64 = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // Save Data to Google Sheet
+    async function saveIssue(e) {
+      e.preventDefault();
+      const category = document.querySelector('input[name="category"]:checked')?.value;
+      const ianRefNo = document.getElementById("ianRefNo").value.trim();
+      const reportNo = document.getElementById("reportNo").value.trim();
+      const remarks = document.getElementById("remarks").value.trim();
+      const selectedIssues = Array.from(document.querySelectorAll('input[name="issues"]:checked')).map(cb => cb.value);
+
+      if (selectedIssues.length === 0) {
+        alert("Please select at least one issue type.");
+        return;
+      }
+
+      const submitBtn = document.getElementById("submitBtn");
+      submitBtn.disabled = true;
+      submitBtn.innerText = "Submitting to Google Sheet...";
+
+      const payload = {
+        timestamp: new Date().toLocaleString(),
+        category,
+        ianRefNo,
+        reportNo,
+        issues: selectedIssues.join(", "),
+        remarks,
+        photoReference: locationPhotoBase64 ? "Attached" : "None"
+      };
+
+      if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL !== "YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL") {
+        try {
+          await fetch(GOOGLE_SCRIPT_URL, {
+            method: "POST",
+            mode: "no-cors",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+          alert("Log record submitted successfully to Google Sheet!");
+          document.getElementById("issueForm").reset();
+          document.getElementById("imagePreviewContainer").classList.add("hidden");
+          document.getElementById("locationPreviewContainer").classList.add("hidden");
+          document.getElementById("ocrStatus").classList.add("hidden");
+        } catch (err) {
+          alert("Network error transmitting to Google Sheet.");
+        }
+      } else {
+        alert("Form validated! Replace GOOGLE_SCRIPT_URL in code to write directly to your Google Sheet.");
+      }
+
+      submitBtn.disabled = false;
+      submitBtn.innerText = "Submit Log Entry";
+    }
+  </script>
+</body>
+</html>
