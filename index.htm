@@ -96,6 +96,9 @@
             <label class="flex items-center gap-2 p-2.5 border rounded-lg border-slate-200 hover:bg-slate-50 cursor-pointer text-sm">
               <input type="checkbox" name="issues" value="Missing information" class="rounded text-indigo-600 h-4 w-4" /> Missing information
             </label>
+            <label class="flex items-center gap-2 p-2.5 border rounded-lg border-slate-200 hover:bg-slate-50 cursor-pointer text-sm sm:col-span-2">
+              <input type="checkbox" name="issues" value="Outdated TA used" class="rounded text-indigo-600 h-4 w-4" /> Outdated TA used
+            </label>
           </div>
         </div>
 
@@ -144,8 +147,8 @@
   </div>
 
   <script>
-    // Paste your deployed Google Apps Script Web App URL below
-    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw1CvMRW5T5wHFOjNZ8-iXPTfYMb_Vx-ROQGKwKbIHhbNeohUXH1dZ6XPGTuvo15XE/exec";
+    // Embedded Google Apps Script Web App Endpoint URL
+    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxGmD3baCI5TeNErcZPOLNUsG14qdLkcfsLfxSMP9C3NE6iVpFG_W_EFOhz_evyJgAf/exec";
     
     let locationPhotoBase64 = "";
     let currentCameraTarget = ""; 
@@ -326,7 +329,7 @@
         video.srcObject = mediaStream;
         modal.classList.remove("hidden");
       } catch (err) {
-        alert("Camera direct access blocked. Use 'Choose Photo File'.");
+        alert("Camera direct access blocked. Use 'Choose File'.");
       }
     }
 
@@ -338,7 +341,7 @@
       
       const ctx = canvas.getContext("2d");
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const dataUrl = canvas.toDataURL("image/jpeg");
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
 
       if (currentCameraTarget === 'ocr') {
         const img = new Image();
@@ -371,11 +374,28 @@
       const file = event.target.files[0];
       if (!file) return;
       document.getElementById("locationPhotoName").innerText = file.name;
+
       const reader = new FileReader();
       reader.onload = function(e) {
-        document.getElementById("locationPreview").src = e.target.result;
-        document.getElementById("locationPreviewContainer").classList.remove("hidden");
-        locationPhotoBase64 = e.target.result;
+        const img = new Image();
+        img.onload = function() {
+          const canvas = document.createElement("canvas");
+          const ctx = canvas.getContext("2d");
+          const maxDim = 1000;
+          let w = img.width, h = img.height;
+          if (w > maxDim || h > maxDim) {
+            if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+            else { w = Math.round((w * maxDim) / h); h = maxDim; }
+          }
+          canvas.width = w;
+          canvas.height = h;
+          ctx.drawImage(img, 0, 0, w, h);
+          locationPhotoBase64 = canvas.toDataURL("image/jpeg", 0.7);
+
+          document.getElementById("locationPreview").src = locationPhotoBase64;
+          document.getElementById("locationPreviewContainer").classList.remove("hidden");
+        };
+        img.src = e.target.result;
       };
       reader.readAsDataURL(file);
     }
@@ -404,19 +424,20 @@
         reportNo: reportNo,
         issues: selectedIssues.join(", "),
         remarks: remarks,
-        photoReference: locationPhotoBase64 ? "Attached" : "None"
+        photoData: locationPhotoBase64
       };
 
       try {
-        // Send payload as text/plain to prevent browser preflight CORS blocks
         await fetch(GOOGLE_SCRIPT_URL, {
           method: "POST",
           headers: { "Content-Type": "text/plain;charset=utf-8" },
           body: JSON.stringify(payload)
         });
 
-        alert("Submitted successfully to Issue Log!");
+        alert("Submitted successfully! Photo link saved in Google Sheet.");
         document.getElementById("issueForm").reset();
+        locationPhotoBase64 = "";
+        document.getElementById("locationPhotoName").innerText = "No photo attached";
         document.getElementById("imagePreviewContainer")?.classList.add("hidden");
         document.getElementById("candidateContainer")?.classList.add("hidden");
         document.getElementById("locationPreviewContainer")?.classList.add("hidden");
